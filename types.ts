@@ -26,6 +26,14 @@ export enum Tone {
   NOVEL = "소설체 (-다)"
 }
 
+export enum VoiceName {
+  KORE = "Kore (표준 차분한 남성)",
+  PUCK = "Puck (밝고 경쾌한 남성)",
+  CHARON = "Charon (깊고 중후한 남성)",
+  FENRIR = "Fenrir (강렬하고 날카로운 남성)",
+  ZEPHYR = "Zephyr (부드러운 남성)"
+}
+
 export enum WorkMode {
   NEW = "새로운 스토리 구상",
   UPLOAD = "내 대본 사용하기 (TXT)",
@@ -33,18 +41,20 @@ export enum WorkMode {
   RESTORE = "지난 글 수정 / 복원"
 }
 
+export interface Scene {
+  id: number;
+  label: string;
+  content: string;
+  imagePrompt: string;
+  imageUrl?: string | null;
+}
+
 export interface ScriptResult {
   title: string;
-  intro: string;      // 도입부
-  development: string; // 전개
-  climax: string;      // 절정
-  resolution: string;  // 결말
-  outro: string;       // 아웃트로/엔딩
-  imagePrompt: string;
+  scenes: Scene[];
 }
 
 export interface FinalAssets {
   script: ScriptResult;
-  imageUrl: string | null;
   audioBlob: Blob | null;
 }
