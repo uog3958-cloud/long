@@ -5,6 +5,10 @@ import { Genre, Tone, WorkMode, ScriptResult, FinalAssets } from './types';
 import JSZip from 'jszip';
 
 const App: React.FC = () => {
+  // Auth State
+  const [apiKey, setApiKey] = useState<string>(process.env.API_KEY || "");
+  const [isKeySaved, setIsKeySaved] = useState<boolean>(!!process.env.API_KEY);
+
   // UI States
   const [step, setStep] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
@@ -32,11 +36,20 @@ const App: React.FC = () => {
     );
   };
 
+  const getAI = () => {
+    if (!apiKey) throw new Error("API Key가 필요합니다.");
+    return new GoogleGenAI({ apiKey });
+  };
+
   const handleGenerateSynopsis = async () => {
+    if (!apiKey) {
+      alert("먼저 Gemini API Key를 입력해주세요.");
+      return;
+    }
     setLoading(true);
     setLoadingMsg("AI가 깊이 있는 롱폼 시나리오를 구성 중입니다...");
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = getAI();
       const prompt = `
         다음 정보를 바탕으로 유튜브 롱폼(5~10분 분량) 영상 시놉시스를 작성해줘.
         장르: ${selectedGenres.join(', ')}
@@ -63,13 +76,17 @@ const App: React.FC = () => {
   };
 
   const handleFullGenerate = async () => {
+    if (!apiKey) {
+      alert("먼저 Gemini API Key를 입력해주세요.");
+      return;
+    }
     setLoading(true);
     setLoadingMsg("롱폼 대본 구성, 시네마틱 이미지, 전문 나레이션 생성 중...");
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = getAI();
 
-      // 1. Long-form Script & Image Prompt Generation (Gemini 3 Pro for complex reasoning)
+      // 1. Long-form Script & Image Prompt Generation
       const scriptPrompt = `
         시놉시스를 바탕으로 정교한 롱폼 영상 대본을 작성해줘.
         시놉시스: ${synopsis}
@@ -113,7 +130,7 @@ const App: React.FC = () => {
       // 2. High Quality Image Generation
       let imageUrl = "";
       const imageResponse = await ai.models.generateContent({
-        model: "gemini-3-pro-image-preview", // 롱폼에 걸맞는 고화질 모델
+        model: "gemini-3-pro-image-preview",
         contents: `A high-quality cinematic movie poster style visual: ${scriptData.imagePrompt}. Professional lighting, 4k resolution, emotional atmosphere, no text.`,
         config: {
           imageConfig: { aspectRatio: "16:9", imageSize: "1K" }
@@ -156,7 +173,7 @@ const App: React.FC = () => {
       setStep(4);
     } catch (error) {
       console.error(error);
-      alert("생성 작업 중 오류가 발생했습니다. API 키 권한이나 할당량을 확인해주세요.");
+      alert("생성 작업 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -191,14 +208,44 @@ const App: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-10">
       <header className="mb-10 text-center">
-        <div className="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/50 rounded-full text-blue-400 text-xs font-bold mb-4">
-          LONG-FORM PRODUCTION MODE
+        <div className="inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/50 rounded-full text-blue-400 text-xs font-bold mb-4 uppercase tracking-widest">
+          Long-Form Cinematic Engine
         </div>
         <h1 className="text-5xl font-black bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 bg-clip-text text-transparent mb-3">
           Gemini Cinema Studio
         </h1>
-        <p className="text-gray-400 text-lg">깊이 있는 서사, 고화질 이미지, 완벽한 나레이션의 롱폼 영상 제작</p>
+        <p className="text-gray-400 text-lg">시나리오부터 시네마틱 포스터, 고음질 나레이션까지</p>
       </header>
+
+      {/* API Key Input Section */}
+      <div className="mb-10 bg-gray-800/40 border border-gray-700 p-4 rounded-2xl flex flex-col md:flex-row items-center gap-4">
+        <div className="flex-1 w-full">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Gemini API Key</label>
+          <input 
+            type="password"
+            value={apiKey}
+            onChange={(e) => {
+              setApiKey(e.target.value);
+              setIsKeySaved(false);
+            }}
+            placeholder="AI Studio에서 발급받은 API Key를 입력하세요"
+            className="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+          />
+        </div>
+        <button 
+          onClick={() => {
+            if(apiKey.length > 10) {
+              setIsKeySaved(true);
+              alert("API Key가 설정되었습니다.");
+            } else {
+              alert("유효한 API Key를 입력해주세요.");
+            }
+          }}
+          className={`px-6 py-2 rounded-xl font-bold text-sm transition-all ${isKeySaved ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-500'}`}
+        >
+          {isKeySaved ? 'Key 설정 완료 ✓' : 'Key 설정'}
+        </button>
+      </div>
 
       {/* Progress Stepper */}
       <div className="flex justify-between mb-12 px-6">
@@ -216,7 +263,7 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-6 text-center backdrop-blur-sm">
           <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
           <p className="text-2xl font-bold text-white mb-2">{loadingMsg}</p>
-          <p className="text-gray-500">롱폼 대본은 데이터가 많아 시간이 조금 더 소요될 수 있습니다.</p>
+          <p className="text-gray-500">롱폼 제작에는 정교한 연산이 필요하여 약 1분 정도 소요됩니다.</p>
         </div>
       )}
 
@@ -246,7 +293,7 @@ const App: React.FC = () => {
 
           <section>
             <h2 className="text-2xl font-bold mb-6 flex items-center">
-              <span className="bg-purple-500 p-2 rounded-lg mr-3">🗣️</span> 전체적인 어조
+              <span className="bg-purple-500 p-2 rounded-lg mr-3">🗣️</span> 내레이션 톤
             </h2>
             <div className="flex gap-4">
               {Object.values(Tone).map(t => (
@@ -266,11 +313,11 @@ const App: React.FC = () => {
           </section>
 
           <button 
-            disabled={selectedGenres.length === 0}
+            disabled={selectedGenres.length === 0 || !isKeySaved}
             onClick={() => setStep(2)}
             className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 py-5 rounded-2xl font-black text-xl transition-all shadow-xl hover:scale-[1.01] active:scale-[0.99]"
           >
-            기획 단계로 이동
+            {!isKeySaved ? 'API Key를 먼저 설정해주세요' : '스토리 기획 시작'}
           </button>
         </div>
       )}
@@ -299,30 +346,30 @@ const App: React.FC = () => {
 
           <div className="grid grid-cols-1 gap-6">
              <div className="group">
-              <label className="block text-sm font-bold text-gray-400 mb-2 group-focus-within:text-blue-400 transition-colors">전체 사연/아이디어</label>
+              <label className="block text-sm font-bold text-gray-400 mb-2 group-focus-within:text-blue-400 transition-colors">전체 스토리 개요</label>
               <textarea 
                 value={subject} 
                 onChange={e => setSubject(e.target.value)}
-                placeholder="롱폼 영상의 핵심이 되는 긴 이야기를 들려주세요."
+                placeholder="어떤 이야기를 영상으로 만들고 싶나요? 자유롭게 적어주세요."
                 className="w-full bg-gray-900 border border-gray-700 rounded-2xl p-4 h-40 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">주인공 설정</label>
-                <input value={protagonist} onChange={e => setProtagonist(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="성격, 나이, 특징 등" />
+                <label className="block text-sm font-bold text-gray-400 mb-2">핵심 주인공</label>
+                <input value={protagonist} onChange={e => setProtagonist(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="성격, 역할 등" />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">공간/시대 배경</label>
-                <input value={background} onChange={e => setBackground(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="장소, 연도, 사회 분위기" />
+                <label className="block text-sm font-bold text-gray-400 mb-2">공간/배경</label>
+                <input value={background} onChange={e => setBackground(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="장소, 분위기 등" />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">주요 갈등 요약</label>
-                <input value={incident} onChange={e => setIncident(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="누가, 무엇 때문에 부딪히는지" />
+                <label className="block text-sm font-bold text-gray-400 mb-2">중심 갈등</label>
+                <input value={incident} onChange={e => setIncident(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="무슨 일이 일어나는지" />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-400 mb-2">최종 전달 감정</label>
-                <input value={emotion} onChange={e => setEmotion(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="감동, 공포, 분노, 카타르시스 등" />
+                <label className="block text-sm font-bold text-gray-400 mb-2">추구하는 감정</label>
+                <input value={emotion} onChange={e => setEmotion(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500" placeholder="예: 소름 돋는 반전, 감동" />
               </div>
             </div>
           </div>
@@ -330,14 +377,14 @@ const App: React.FC = () => {
           <div className="flex gap-4 pt-4 border-t border-gray-700">
             <button onClick={() => setStep(1)} className="flex-1 bg-gray-700 hover:bg-gray-600 py-4 rounded-2xl font-bold transition-colors">이전으로</button>
             <button onClick={handleGenerateSynopsis} className="flex-[2] bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 py-4 rounded-2xl font-black shadow-lg hover:shadow-indigo-500/30 transition-all">
-              AI 롱폼 시나리오 기획 시작 ✨
+              상세 시나리오 기획 ✨
             </button>
           </div>
           
           {synopsis && (
             <div className="mt-8 p-6 bg-gray-900/80 rounded-3xl border border-blue-500/30 animate-in fade-in slide-in-from-top-4">
               <h3 className="text-xl font-black mb-4 flex items-center">
-                <span className="text-blue-400 mr-2">✦</span> 생성된 시나리오 (수정 가능)
+                <span className="text-blue-400 mr-2">✦</span> AI 시나리오 초안 (수정 가능)
               </h3>
               <textarea 
                 value={synopsis}
@@ -345,7 +392,7 @@ const App: React.FC = () => {
                 className="w-full bg-transparent border-none rounded-lg p-0 h-64 text-gray-300 leading-relaxed focus:ring-0 resize-none text-base"
               />
               <button onClick={() => setStep(3)} className="w-full mt-6 bg-green-600 hover:bg-green-500 py-4 rounded-2xl font-black text-lg transition-all shadow-lg hover:shadow-green-500/20">
-                시나리오 확정 및 제작 단계로 ❯
+                시나리오 확정 및 제작 실행 ❯
               </button>
             </div>
           )}
@@ -359,18 +406,18 @@ const App: React.FC = () => {
             ✓
           </div>
           <div>
-            <h2 className="text-3xl font-black mb-3">제작 준비가 완료되었습니다.</h2>
-            <p className="text-gray-400 text-lg">Gemini 3 Pro 모델이 이 시나리오를 바탕으로 <br/> <span className="text-blue-400 font-bold">5부작 대본, 4K 포스터, 고음질 나레이션</span>을 생성합니다.</p>
+            <h2 className="text-3xl font-black mb-3">콘텐츠 빌드 준비 완료</h2>
+            <p className="text-gray-400 text-lg">최첨단 Gemini 3 Pro 모델이 <br/> <span className="text-blue-400 font-bold">풀스크립트, 4K 포스터, AI 내레이션</span>을 생성합니다.</p>
           </div>
           
-          <div className="p-6 bg-gray-950 rounded-2xl text-left text-base text-gray-400 max-h-56 overflow-y-auto border border-gray-800 custom-scrollbar italic leading-relaxed">
+          <div className="p-6 bg-gray-950 rounded-2xl text-left text-base text-gray-400 max-h-56 overflow-y-auto border border-gray-800 italic leading-relaxed">
             "{synopsis}"
           </div>
 
           <div className="flex gap-4">
             <button onClick={() => setStep(2)} className="flex-1 bg-gray-700 hover:bg-gray-600 py-5 rounded-2xl font-bold">기획 수정</button>
             <button onClick={handleFullGenerate} className="flex-[2] bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-3 shadow-2xl hover:scale-[1.02] transition-all">
-              최종 시나리오 빌드 시작 🚀
+              최종 빌드 시작 🚀
             </button>
           </div>
         </div>
@@ -381,18 +428,18 @@ const App: React.FC = () => {
         <div className="space-y-8 animate-in fade-in duration-1000">
           <div className="bg-blue-500/10 border border-blue-500/30 p-6 rounded-3xl text-center">
             <h2 className="text-2xl font-black text-blue-400 mb-1">{finalAssets.script.title}</h2>
-            <p className="text-gray-500">롱폼 시나리오 빌드 결과물</p>
+            <p className="text-gray-500 tracking-widest text-xs uppercase font-bold">Content Asset Package</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-gray-800/50 rounded-3xl p-8 border border-gray-700 shadow-xl">
                 <h2 className="text-xl font-black mb-6 flex items-center border-b border-gray-700 pb-4">
-                  <span className="bg-blue-500 w-2 h-6 rounded-full mr-3"></span> 전체 시나리오 대본
+                  <span className="bg-blue-500 w-2 h-6 rounded-full mr-3"></span> 롱폼 전체 스크립트
                 </h2>
                 <div className="space-y-8 text-base leading-loose max-h-[700px] overflow-y-auto pr-4 custom-scrollbar">
                   <div>
-                    <span className="inline-block px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs font-black mb-3">PART 1. INTRO</span>
+                    <span className="inline-block px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-xs font-black mb-3">PART 1. OPENING</span>
                     <p className="bg-gray-900/50 p-5 rounded-2xl border-l-4 border-red-500 text-gray-200">{finalAssets.script.intro}</p>
                   </div>
                   <div>
@@ -400,7 +447,7 @@ const App: React.FC = () => {
                     <p className="text-gray-300 px-2">{finalAssets.script.development}</p>
                   </div>
                   <div>
-                    <span className="inline-block px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg text-xs font-black mb-3">PART 3. CLIMAX</span>
+                    <span className="inline-block px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-lg text-xs font-black mb-3">PART 3. THE CLIMAX</span>
                     <p className="text-gray-200 px-2 font-medium bg-white/5 p-4 rounded-xl border border-white/10">{finalAssets.script.climax}</p>
                   </div>
                   <div>
@@ -408,7 +455,7 @@ const App: React.FC = () => {
                     <p className="text-gray-300 px-2">{finalAssets.script.resolution}</p>
                   </div>
                   <div>
-                    <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-xs font-black mb-3">PART 5. OUTRO</span>
+                    <span className="inline-block px-3 py-1 bg-purple-500/20 text-purple-400 rounded-lg text-xs font-black mb-3">PART 5. EPILOGUE</span>
                     <p className="text-gray-400 px-2 italic">{finalAssets.script.outro}</p>
                   </div>
                 </div>
@@ -418,23 +465,23 @@ const App: React.FC = () => {
             <div className="space-y-6">
               <div className="bg-gray-800/50 rounded-3xl p-6 border border-gray-700 shadow-xl">
                 <h2 className="text-xl font-black mb-4 flex items-center">
-                  <span className="bg-indigo-500 w-2 h-6 rounded-full mr-3"></span> 메인 비주얼
+                  <span className="bg-indigo-500 w-2 h-6 rounded-full mr-3"></span> 메인 시네마틱 아트
                 </h2>
                 {finalAssets.imageUrl ? (
                   <div className="group relative overflow-hidden rounded-2xl shadow-2xl">
                     <img src={finalAssets.imageUrl} alt="Generated" className="w-full aspect-[16/9] object-cover transition-transform duration-700 group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-4">
-                      <p className="text-xs text-gray-300 line-clamp-2">{finalAssets.script.imagePrompt}</p>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-[10px] text-gray-300 line-clamp-2">{finalAssets.script.imagePrompt}</p>
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full aspect-video bg-gray-900 rounded-2xl flex items-center justify-center text-gray-600 border border-dashed border-gray-700">이미지 로드 중...</div>
+                  <div className="w-full aspect-video bg-gray-900 rounded-2xl flex items-center justify-center text-gray-600 border border-dashed border-gray-700">이미지 없음</div>
                 )}
               </div>
 
               <div className="bg-gray-800/50 rounded-3xl p-6 border border-gray-700 shadow-xl">
                 <h2 className="text-xl font-black mb-4 flex items-center">
-                  <span className="bg-emerald-500 w-2 h-6 rounded-full mr-3"></span> 고음질 나레이션
+                  <span className="bg-emerald-500 w-2 h-6 rounded-full mr-3"></span> AI 전문 내레이션
                 </h2>
                 {finalAssets.audioBlob ? (
                   <div className="bg-gray-950 p-4 rounded-2xl">
@@ -443,7 +490,7 @@ const App: React.FC = () => {
                     </audio>
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-sm">음성 파일을 준비하지 못했습니다.</p>
+                  <p className="text-gray-500 text-sm">오디오 없음</p>
                 )}
               </div>
 
@@ -451,22 +498,22 @@ const App: React.FC = () => {
                 onClick={downloadZip}
                 className="w-full bg-gradient-to-br from-orange-500 to-rose-600 hover:from-orange-400 hover:to-rose-500 py-6 rounded-3xl font-black text-xl shadow-[0_10px_30px_rgba(244,63,94,0.3)] flex items-center justify-center gap-4 transition-all hover:-translate-y-1 active:translate-y-0"
               >
-                <span className="text-2xl">📦</span> 패키지 전체 다운로드
+                <span className="text-2xl">📦</span> 패키지 일괄 다운로드
               </button>
             </div>
           </div>
           
           <div className="text-center pt-10">
             <button onClick={() => setStep(1)} className="text-gray-500 hover:text-white transition-colors flex items-center justify-center mx-auto gap-2">
-              <span>↺</span> 새로운 롱폼 프로젝트 시작
+              <span>↺</span> 처음 단계로 돌아가기
             </button>
           </div>
         </div>
       )}
 
       <footer className="mt-20 text-center border-t border-gray-800 pt-10 pb-10">
-        <p className="text-gray-600 text-sm tracking-widest uppercase font-bold">
-          Powered by Gemini 3 Pro & 2.5 Flash Cinema Engine
+        <p className="text-gray-600 text-xs tracking-[0.2em] uppercase font-bold">
+          High-End AI Content Studio • Gemini 3 Pro
         </p>
       </footer>
 
