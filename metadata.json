@@ -1,0 +1,7 @@
+{
+  "name": "Gemini Shorts Studio",
+  "description": "An all-in-one AI studio to create YouTube Shorts scripts, generate matching AI images, and produce high-quality AI voiceovers using Gemini 3 and 2.5 models.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
